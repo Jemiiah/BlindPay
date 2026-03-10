@@ -1,0 +1,27 @@
+{
+  "name": "blindpay-contracts",
+  "version": "1.0.0",
+  "description": "BlindPay smart contracts - FHE-encrypted invoices on fhEVM",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@fhevm/hardhat-plugin": "^0.4.2",
+    "hardhat": "^2.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@fhevm/solidity": "^0.11.1",
+    "@openzeppelin/contracts": "^5.2.0",
+    "dotenv": "^16.4.0"
+  }
+}
