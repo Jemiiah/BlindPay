@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {FHE, externalEuint64, euint64} from "@fhevm/solidity/lib/FHE.sol";
+import {FHE, externalEuint64, euint64, externalEaddress, eaddress, ebool} from "@fhevm/solidity/lib/FHE.sol";
 import {ZamaEthereumConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/// @title BlindPay - Confidential invoice payments using Zama FHE
-/// @notice Invoice amounts are stored as FHE-encrypted euint64 on-chain.
-///         Merchant running totals are encrypted. Only authorized parties can decrypt.
+/// @title BlindPay V2 - Fully Confidential Invoice Payments using Zama FHE
+/// @notice All sensitive data (amounts, merchant, payer, status) is FHE-encrypted.
+///         Funds are held in the contract and claimed by merchants via a commitment scheme.
 contract BlindPay is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -22,49 +22,29 @@ contract BlindPay is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     uint8 public constant TYPE_MULTIPAY = 1;
     uint8 public constant TYPE_DONATION = 2;
 
-    uint8 public constant STATUS_PENDING = 0;
-    uint8 public constant STATUS_SETTLED = 1;
-
     // --- Structs ---
     struct Invoice {
-        address merchant;
-        euint64 encAmount; // FHE-encrypted amount (6-decimal format)
-        bytes32 commitHash; // keccak256(abi.encodePacked(merchant, amount, salt))
-        uint8 tokenType;
-        uint8 invoiceType;
-        uint8 status;
-        uint256 paymentCount;
+        eaddress encMerchant;   // encrypted merchant address
+        euint64  encAmount;     // encrypted amount (6-decimal format)
+        eaddress encPayer;      // encrypted payer (set on payment)
+        ebool    isPaid;        // encrypted status
+        uint8    tokenType;     // 0=ETH, 1=USDC (plaintext, needed for control flow)
+        uint8    invoiceType;   // 0=standard, 1=multipay, 2=donation (plaintext)
+        uint256  paymentCount;  // counter (plaintext, used as status proxy)
     }
 
     // --- State ---
     IERC20 public usdcToken;
-    mapping(bytes32 => Invoice) private invoices; // salt => Invoice
-    mapping(bytes32 => bool) public receiptExists; // receiptHash => bool
-    mapping(address => euint64) private merchantTotals; // encrypted running totals
-    mapping(address => uint256) public invoiceCount; // per-merchant count
+    mapping(bytes32 => Invoice) private invoices;          // salt => Invoice
+    mapping(bytes32 => bytes32) private claimHashes;       // salt => keccak256(merchant, salt, claimSecret)
+    mapping(bytes32 => uint256) private heldAmounts;       // salt => funds held in contract (wei for ETH, 6-dec for USDC)
+    mapping(bytes32 => bool) public receiptExists;         // receiptHash => bool
+    mapping(address => uint256) public invoiceCount;       // per-merchant count
 
-    // --- Events ---
-    event InvoiceCreated(
-        bytes32 indexed salt,
-        address indexed merchant,
-        bytes32 commitHash,
-        uint8 tokenType,
-        uint8 invoiceType
-    );
-
-    event PaymentMade(
-        bytes32 indexed salt,
-        address indexed payer,
-        bytes32 receiptHash,
-        uint8 tokenType
-    );
-
-    event PaymentReceived(
-        bytes32 indexed salt,
-        address indexed merchant,
-        bytes32 receiptHash,
-        uint8 tokenType
-    );
+    // --- Events (privacy-preserving: no addresses, no amounts) ---
+    event InvoiceCreated(bytes32 indexed salt);
+    event PaymentMade(bytes32 indexed salt, bytes32 receiptHash);
+    event FundsClaimed(bytes32 indexed salt);
 
     // --- Constructor ---
     constructor(address _usdcToken) Ownable(msg.sender) {
@@ -75,156 +55,178 @@ contract BlindPay is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     //                           INVOICE CREATION
     // =========================================================================
 
-    /// @notice Create a new invoice with an FHE-encrypted amount
-    /// @param encAmount  Encrypted amount (externalEuint64 from client-side FHE encryption)
-    /// @param inputProof ZKPoK proof for the encrypted input
-    /// @param salt       Unique bytes32 identifier for this invoice
-    /// @param commitHash keccak256(abi.encodePacked(merchant, amount, salt)) computed client-side
-    /// @param invoiceType 0=standard, 1=multipay, 2=donation
-    /// @param tokenType   0=ETH, 1=USDC
+    /// @notice Create a new invoice with FHE-encrypted amount and merchant address
+    /// @param encAmount         Encrypted amount (externalEuint64)
+    /// @param inputProofAmount  ZKPoK proof for the encrypted amount
+    /// @param encMerchantExt    Encrypted merchant address (externalEaddress)
+    /// @param inputProofMerchant ZKPoK proof for the encrypted merchant
+    /// @param salt              Unique bytes32 identifier for this invoice
+    /// @param claimHash         keccak256(abi.encodePacked(merchant, salt, claimSecret))
+    /// @param invoiceType       0=standard, 1=multipay, 2=donation
+    /// @param tokenType         0=ETH, 1=USDC
     function createInvoice(
         externalEuint64 encAmount,
-        bytes calldata inputProof,
+        bytes calldata inputProofAmount,
+        externalEaddress encMerchantExt,
+        bytes calldata inputProofMerchant,
         bytes32 salt,
-        bytes32 commitHash,
+        bytes32 claimHash,
         uint8 invoiceType,
         uint8 tokenType
     ) external {
-        require(invoices[salt].merchant == address(0), "Salt already used");
+        require(invoices[salt].paymentCount == 0 && !FHE.isInitialized(invoices[salt].encAmount), "Salt already used");
         require(tokenType <= TOKEN_USDC, "Invalid token type");
         require(invoiceType <= TYPE_DONATION, "Invalid invoice type");
 
-        // Validate and convert encrypted input
-        euint64 amount = FHE.fromExternal(encAmount, inputProof);
+        // Convert encrypted inputs
+        euint64 amount = FHE.fromExternal(encAmount, inputProofAmount);
+        eaddress merchant = FHE.fromExternal(encMerchantExt, inputProofMerchant);
 
-        // Set ACL: contract can operate on this value, merchant can decrypt it
+        // Set ACL: contract can operate, creator can decrypt
         FHE.allowThis(amount);
         FHE.allow(amount, msg.sender);
+        FHE.allowThis(merchant);
+        FHE.allow(merchant, msg.sender);
+
+        // Initialize encrypted fields
+        ebool paid = FHE.asEbool(false);
+        FHE.allowThis(paid);
+        FHE.allow(paid, msg.sender);
+
+        eaddress zeroPayer = FHE.asEaddress(address(0));
+        FHE.allowThis(zeroPayer);
 
         invoices[salt] = Invoice({
-            merchant: msg.sender,
+            encMerchant: merchant,
             encAmount: amount,
-            commitHash: commitHash,
+            encPayer: zeroPayer,
+            isPaid: paid,
             tokenType: tokenType,
             invoiceType: invoiceType,
-            status: STATUS_PENDING,
             paymentCount: 0
         });
 
+        claimHashes[salt] = claimHash;
         invoiceCount[msg.sender]++;
 
-        emit InvoiceCreated(salt, msg.sender, commitHash, tokenType, invoiceType);
+        emit InvoiceCreated(salt);
     }
 
     // =========================================================================
     //                              PAYMENT
     // =========================================================================
 
-    /// @notice Pay an existing invoice
-    /// @param salt   The invoice identifier
-    /// @param amount The payment amount in 6-decimal format (must match commitHash for standard invoices)
-    /// @dev For ETH payments: send msg.value = amount * 1e12 (converting 6-dec to 18-dec wei)
-    ///      For USDC payments: approve this contract first, then call with msg.value = 0
+    /// @notice Pay an existing invoice. Funds are held in the contract until merchant claims.
+    /// @param salt         The invoice identifier
+    /// @param encPayAmount Encrypted payment amount (externalEuint64)
+    /// @param inputProof   ZKPoK proof for the encrypted payment amount
+    /// @param usdcAmount   Plaintext USDC amount for transferFrom (ignored for ETH).
+    ///                     Acceptable because USDC Transfer events already leak amounts.
     function payInvoice(
         bytes32 salt,
-        uint256 amount
+        externalEuint64 encPayAmount,
+        bytes calldata inputProof,
+        uint256 usdcAmount
     ) external payable nonReentrant {
         Invoice storage inv = invoices[salt];
-        require(inv.merchant != address(0), "Invoice not found");
+        require(FHE.isInitialized(inv.encAmount), "Invoice not found");
         require(
-            inv.invoiceType == TYPE_MULTIPAY || inv.status == STATUS_PENDING,
-            "Invoice already settled"
+            inv.invoiceType == TYPE_MULTIPAY || inv.paymentCount == 0,
+            "Invoice already paid"
         );
 
-        // --- CHECKS ---
-        if (inv.invoiceType == TYPE_STANDARD) {
-            // Verify the payer's amount matches the invoice commitment
-            bytes32 expectedHash = keccak256(
-                abi.encodePacked(inv.merchant, amount, salt)
-            );
-            require(expectedHash == inv.commitHash, "Amount mismatch");
-        } else {
-            // Donation and multipay accept any amount > 0
-            require(amount > 0, "Amount must be > 0");
-        }
+        // Convert encrypted payment amount
+        euint64 payAmount = FHE.fromExternal(encPayAmount, inputProof);
+        FHE.allowThis(payAmount);
 
-        // --- EFFECTS (before external calls) ---
+        // --- EFFECTS ---
         inv.paymentCount++;
+
         if (inv.invoiceType != TYPE_MULTIPAY) {
-            inv.status = STATUS_SETTLED;
+            ebool paid = FHE.asEbool(true);
+            FHE.allowThis(paid);
+            inv.isPaid = paid;
         }
 
-        // Generate unique receipt hash
+        // Store encrypted payer
+        eaddress encPayer = FHE.asEaddress(msg.sender);
+        FHE.allowThis(encPayer);
+        inv.encPayer = encPayer;
+
+        // Generate receipt hash (salt + timestamp + paymentCount — no addresses)
         bytes32 receiptHash = keccak256(
-            abi.encodePacked(msg.sender, salt, block.timestamp, inv.paymentCount)
+            abi.encodePacked(salt, block.timestamp, inv.paymentCount)
         );
         receiptExists[receiptHash] = true;
 
-        // Encrypt payment amount and update merchant running total
-        euint64 encPayment = FHE.asEuint64(uint64(amount));
-        FHE.allowThis(encPayment);
-
-        if (FHE.isInitialized(merchantTotals[inv.merchant])) {
-            merchantTotals[inv.merchant] = FHE.add(
-                merchantTotals[inv.merchant],
-                encPayment
-            );
-        } else {
-            merchantTotals[inv.merchant] = encPayment;
-        }
-        FHE.allowThis(merchantTotals[inv.merchant]);
-        FHE.allow(merchantTotals[inv.merchant], inv.merchant);
-
-        // --- INTERACTIONS (external calls last) ---
+        // --- INTERACTIONS ---
         if (inv.tokenType == TOKEN_ETH) {
-            // Convert 6-decimal amount to 18-decimal wei
-            uint256 expectedWei = amount * 1e12;
-            require(msg.value >= expectedWei, "Insufficient ETH");
-
-            (bool sent, ) = payable(inv.merchant).call{value: expectedWei}("");
-            require(sent, "ETH transfer failed");
-
-            // Refund excess ETH
-            if (msg.value > expectedWei) {
-                (bool refunded, ) = payable(msg.sender).call{
-                    value: msg.value - expectedWei
-                }("");
-                require(refunded, "ETH refund failed");
-            }
+            require(msg.value > 0, "Must send ETH");
+            heldAmounts[salt] += msg.value;
         } else {
-            require(msg.value == 0, "Do not send ETH for token payment");
-            usdcToken.safeTransferFrom(msg.sender, inv.merchant, amount);
+            require(msg.value == 0, "Do not send ETH for USDC payment");
+            require(usdcAmount > 0, "USDC amount must be > 0");
+            usdcToken.safeTransferFrom(msg.sender, address(this), usdcAmount);
+            heldAmounts[salt] += usdcAmount;
         }
 
-        emit PaymentMade(salt, msg.sender, receiptHash, inv.tokenType);
-        emit PaymentReceived(salt, inv.merchant, receiptHash, inv.tokenType);
+        emit PaymentMade(salt, receiptHash);
+    }
+
+    // =========================================================================
+    //                           FUND CLAIMING
+    // =========================================================================
+
+    /// @notice Merchant claims held funds using the commitment scheme
+    /// @param salt        The invoice identifier
+    /// @param claimSecret The secret used when creating the invoice
+    function claimFunds(bytes32 salt, bytes32 claimSecret) external nonReentrant {
+        require(
+            keccak256(abi.encodePacked(msg.sender, salt, claimSecret)) == claimHashes[salt],
+            "Invalid claim"
+        );
+
+        Invoice storage inv = invoices[salt];
+        require(inv.paymentCount > 0, "No payments to claim");
+
+        uint256 amount = heldAmounts[salt];
+        require(amount > 0, "No funds to claim");
+
+        // Zero out before transfer
+        heldAmounts[salt] = 0;
+
+        if (inv.tokenType == TOKEN_ETH) {
+            (bool sent, ) = payable(msg.sender).call{value: amount}("");
+            require(sent, "ETH transfer failed");
+        } else {
+            usdcToken.safeTransfer(msg.sender, amount);
+        }
+
+        emit FundsClaimed(salt);
     }
 
     // =========================================================================
     //                           VIEW FUNCTIONS
     // =========================================================================
 
-    /// @notice Get invoice metadata (encrypted amount NOT returned)
+    /// @notice Get non-sensitive invoice metadata
     function getInvoice(bytes32 salt)
         external
         view
         returns (
-            address merchant,
             uint8 tokenType,
             uint8 invoiceType,
-            uint8 status,
             uint256 paymentCount,
-            bytes32 commitHash
+            bool hasBeenCreated
         )
     {
         Invoice storage inv = invoices[salt];
+        bool created = FHE.isInitialized(inv.encAmount);
         return (
-            inv.merchant,
             inv.tokenType,
             inv.invoiceType,
-            inv.status,
             inv.paymentCount,
-            inv.commitHash
+            created
         );
     }
 
@@ -237,9 +239,12 @@ contract BlindPay is ZamaEthereumConfig, Ownable, ReentrancyGuard {
     //                              ADMIN
     // =========================================================================
 
-    /// @notice Update the USDC token address (for migration without redeployment)
+    /// @notice Update the USDC token address
     function updateUsdcToken(address _newUsdc) external onlyOwner {
         require(_newUsdc != address(0), "Invalid address");
         usdcToken = IERC20(_newUsdc);
     }
+
+    /// @notice Accept ETH deposits
+    receive() external payable {}
 }

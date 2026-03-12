@@ -12,6 +12,7 @@ import { wagmiConfig } from '../../hooks/WalletProvider';
 import { CONTRACT_ADDRESS, BlindPayABI } from '../../utils/evm-utils';
 import React from 'react';
 
+// V2: getInvoice returns [tokenType, invoiceType, paymentCount, hasBeenCreated]
 const getInvoiceStatus = async (salt: string): Promise<number | null> => {
     try {
         const invoice = await readContract(wagmiConfig, {
@@ -19,9 +20,10 @@ const getInvoiceStatus = async (salt: string): Promise<number | null> => {
             abi: BlindPayABI,
             functionName: 'getInvoice',
             args: [salt as `0x${string}`],
-        }) as [string, number, number, number, bigint, string];
-        // invoice[3] is the status: 0=pending, 1=settled
-        return invoice[3];
+        }) as [number, number, bigint, boolean];
+        // paymentCount > 0 means paid
+        const paymentCount = Number(invoice[2]);
+        return paymentCount > 0 ? 1 : 0;
     } catch {
         return null;
     }
@@ -97,14 +99,11 @@ const Explorer: React.FC = () => {
 
     const pendingCount = transactions.filter(t => t.status === 'PENDING').length;
     const settledCount = transactions.filter(t => t.status === 'SETTLED').length;
-    const uniqueMerchants = new Set(transactions.map(t => t.merchant_address)).size;
 
     const stats = [
         { label: 'Total Null Invoices', value: transactions.length.toString(), trend: '' },
         { label: 'Pending', value: pendingCount.toString(), trend: '' },
         { label: 'Settled', value: settledCount.toString(), trend: '' },
-        { label: 'Active Merchants', value: uniqueMerchants.toString(), trend: '' },
-        // { label: 'Total Volume', value: `${totalVolume.toFixed(2)}`, trend: '' },
     ];
 
     const filteredTransactions = transactions.filter(t => {

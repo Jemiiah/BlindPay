@@ -13,8 +13,9 @@
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@fhevm/hardhat-plugin": "^0.4.2",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.22.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.0"

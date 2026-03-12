@@ -1,8 +1,9 @@
 import { keccak256, encodePacked, toHex, parseUnits, formatUnits } from "viem";
-import BlindPayABI from "../abi/BlindPay.json";
+import BlindPayArtifact from "../abi/BlindPay.json";
 import MockUSDCABI from "../abi/MockUSDC.json";
 
-export { BlindPayABI, MockUSDCABI };
+export const BlindPayABI = BlindPayArtifact.abi;
+export { MockUSDCABI };
 
 export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000";
 export const USDC_ADDRESS = import.meta.env.VITE_USDC_ADDRESS || "0x0000000000000000000000000000000000000000";
@@ -23,27 +24,35 @@ export const generateSalt = (): `0x${string}` => {
 };
 
 /**
- * Compute invoice hash: keccak256(abi.encodePacked(merchant, amount, salt))
- * Amount is in 6-decimal format as uint256
- * This mirrors the on-chain commitment hash computation
+ * Generate a random claim secret as bytes32
  */
-export const computeInvoiceHash = (
+export const generateClaimSecret = (): `0x${string}` => {
+    const randomBytes = new Uint8Array(32);
+    crypto.getRandomValues(randomBytes);
+    return toHex(randomBytes) as `0x${string}`;
+};
+
+/**
+ * Compute claim hash: keccak256(abi.encodePacked(merchant, salt, claimSecret))
+ * Used for the commitment scheme that lets merchants claim funds
+ */
+export const computeClaimHash = (
     merchant: `0x${string}`,
-    amount: bigint,
-    salt: `0x${string}`
+    salt: `0x${string}`,
+    claimSecret: `0x${string}`
 ): `0x${string}` => {
     return keccak256(
         encodePacked(
-            ["address", "uint256", "bytes32"],
-            [merchant, amount, salt]
+            ["address", "bytes32", "bytes32"],
+            [merchant, salt, claimSecret]
         )
     );
 };
 
 /**
  * Parse human-readable amount to 6-decimal on-chain units
- * "100" → 100_000_000n (100 USDC)
- * "0.5" → 500_000n (0.5 ETH in 6-decimal)
+ * "100" -> 100_000_000n (100 USDC)
+ * "0.5" -> 500_000n (0.5 ETH in 6-decimal)
  */
 export const parseAmount = (amount: string | number): bigint => {
     return parseUnits(amount.toString(), TOKEN_DECIMALS);
@@ -83,30 +92,23 @@ export const getExplorerAddressUrl = (address: string): string => {
 // ---- Types matching the on-chain contract ----
 
 export interface InvoiceRecord {
-    invoiceHash: `0x${string}`;
     merchant: `0x${string}`;
     amount: bigint;
-    tokenType: number; // 0 = native (ETH), 1 = ERC-20 (USDC)
-    invoiceType: number; // 0 = standard, 1 = multipay, 2 = donation
+    tokenType: number;     // 0 = native (ETH), 1 = ERC-20 (USDC)
+    invoiceType: number;   // 0 = standard, 1 = multipay, 2 = donation
     salt: `0x${string}`;
+    claimSecret: `0x${string}`;
     memo: string;
-    status: number; // 0 = pending, 1 = settled
+    paymentCount: number;
 }
 
 export interface PayerReceipt {
     receiptHash: `0x${string}`;
-    invoiceHash: `0x${string}`;
-    payer: `0x${string}`;
-    merchant: `0x${string}`;
-    amount: bigint;
-    tokenType: number;
+    salt: `0x${string}`;
     timestamp: number;
 }
 
 export interface MerchantReceipt {
     receiptHash: `0x${string}`;
-    invoiceHash: `0x${string}`;
-    merchant: `0x${string}`;
-    amount: bigint;
-    tokenType: number;
+    salt: `0x${string}`;
 }

@@ -28,15 +28,17 @@ const Verification = () => {
                 setStatus(exists ? 'VALID' : 'INVALID');
             } else {
                 // Check invoice status by salt
+                // V2: getInvoice returns [tokenType, invoiceType, paymentCount, hasBeenCreated]
                 const invoice = await readContract(wagmiConfig, {
                     address: CONTRACT_ADDRESS as `0x${string}`,
                     abi: BlindPayABI,
                     functionName: 'getInvoice',
                     args: [salt as `0x${string}`],
-                }) as [string, number, number, number, bigint, string];
+                }) as [number, number, bigint, boolean];
 
-                const onChainStatus = invoice[3];
-                setStatus(onChainStatus === 1 ? 'VALID' : 'INVALID');
+                const paymentCount = Number(invoice[2]);
+                const hasBeenCreated = invoice[3];
+                setStatus(hasBeenCreated && paymentCount > 0 ? 'VALID' : 'INVALID');
             }
         } catch {
             setStatus('INVALID');

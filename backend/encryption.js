@@ -15,7 +15,11 @@ if (!process.env.ENCRYPTION_KEY) {
 const getKey = () => {
     const keyHex = process.env.ENCRYPTION_KEY;
     if (!keyHex) throw new Error('ENCRYPTION_KEY not found');
-    return Buffer.from(keyHex, 'hex');
+    const buf = Buffer.from(keyHex, 'hex');
+    // AES-256 requires exactly 32 bytes; truncate if longer
+    if (buf.length > 32) return buf.subarray(0, 32);
+    if (buf.length < 32) throw new Error(`ENCRYPTION_KEY too short: need 32 bytes, got ${buf.length}`);
+    return buf;
 };
 
 const encrypt = (text) => {

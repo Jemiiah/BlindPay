@@ -7,8 +7,7 @@ import { injected } from "wagmi/connectors";
 export const wagmiConfig = createConfig({
     chains: [sepolia],
     connectors: [
-        // Detects any browser extension wallet: OKX, MetaMask, Rabby, etc.
-        injected({ shimDisconnect: true }),
+        injected(),
     ],
     transports: {
         [sepolia.id]: http(

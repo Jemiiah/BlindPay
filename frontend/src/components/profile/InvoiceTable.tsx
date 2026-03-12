@@ -14,6 +14,8 @@ interface InvoiceTableProps {
     onSettle: (invoice: any) => void;
     settlingId: string | null;
     onViewPayments: (paymentIds: string[]) => void;
+    onClaim?: (invoice: any) => void;
+    claimingId?: string | null;
 }
 
 export const InvoiceTable: React.FC<InvoiceTableProps> = ({
@@ -26,7 +28,9 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
     onVerify,
     onSettle,
     settlingId,
-    onViewPayments
+    onViewPayments,
+    onClaim,
+    claimingId
 }) => {
     const filteredInvoices = invoices.filter(inv => !search || inv.invoiceHash?.toLowerCase().includes(search.toLowerCase()));
 
@@ -134,6 +138,25 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                                                 <span className="text-[10px] text-yellow-500 animate-pulse px-2">Syncing...</span>
                                             ) : (
                                                 <LinkButton url={paymentLink} urlNoMemo={paymentLinkNoMemo} />
+                                            )}
+
+                                            {/* Claim Button — merchant claims held funds */}
+                                            {onClaim && inv.paymentTxIds?.length > 0 && inv.claimSecret && (
+                                                <button
+                                                    onClick={() => onClaim(inv)}
+                                                    disabled={claimingId === inv.salt}
+                                                    className="flex items-center gap-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded border border-emerald-500/20 hover:border-emerald-500/50 transition-all text-emerald-400 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title="Claim funds from contract"
+                                                >
+                                                    {claimingId === inv.salt ? (
+                                                        <span className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                                                    ) : (
+                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                    )}
+                                                    Claim
+                                                </button>
                                             )}
 
                                             {/* Settle Button for Donation (2) or Multipay (1) if not already settled */}

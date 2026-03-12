@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { useWallet } from "./useWallet";
-import { writeContract, waitForTransactionReceipt } from "wagmi/actions";
+import { writeContract, waitForTransactionReceipt, switchChain } from "wagmi/actions";
 import { wagmiConfig } from "./WalletProvider";
 import {
     generateSalt,
-    computeInvoiceHash,
+    generateClaimSecret,
+    computeClaimHash,
     parseAmount,
     CONTRACT_ADDRESS,
     BlindPayABI,
 } from "../utils/evm-utils";
-import { encryptAmount } from "../utils/fhe";
+import { encryptAmount, encryptAddress } from "../utils/fhe";
 import { InvoiceData } from "../types/invoice";
 
 export type InvoiceType = "standard" | "multipay" | "donation";
 
 export const useCreateInvoice = () => {
-    const { address: publicKey, isConnected } = useWallet();
+    const { address: publicKey, isConnected, isWrongChain } = useWallet();
 
     const [amount, setAmount] = useState<number | "">("");
     const [loading, setLoading] = useState(false);
@@ -30,6 +31,15 @@ export const useCreateInvoice = () => {
             setStatus("Please connect your wallet first.");
             return;
         }
+        if (isWrongChain) {
+            try {
+                setStatus("Switching to Sepolia...");
+                await switchChain(wagmiConfig, { chainId: 11155111 });
+            } catch {
+                setStatus("Please switch to Sepolia network in your wallet.");
+                return;
+            }
+        }
 
         if (invoiceType !== "donation" && (!amount || amount <= 0)) {
             setStatus("Please enter a valid amount.");
@@ -42,14 +52,15 @@ export const useCreateInvoice = () => {
         try {
             const merchant = publicKey;
             const salt = generateSalt();
+            const claimSecret = generateClaimSecret();
             const isDonation = invoiceType === "donation";
             const amountRaw = isDonation ? 0n : parseAmount(Number(amount));
 
-            // Compute commitment hash (mirrors on-chain keccak256)
-            const commitHash = computeInvoiceHash(
+            // Compute claim hash for commitment scheme
+            const claimHash = computeClaimHash(
                 merchant as `0x${string}`,
-                amountRaw,
-                salt
+                salt,
+                claimSecret
             );
 
             // Determine invoice type number
@@ -57,12 +68,20 @@ export const useCreateInvoice = () => {
             if (invoiceType === "multipay") invoiceTypeNum = 1;
             if (invoiceType === "donation") invoiceTypeNum = 2;
 
-            // Encrypt amount for FHE (calldata will contain ciphertext, not plaintext)
+            // Encrypt amount for FHE
             setStatus("Encrypting amount...");
-            const { handle: encHandle, inputProof } = await encryptAmount(
+            const { handle: encAmountHandle, inputProof: amountProof } = await encryptAmount(
                 CONTRACT_ADDRESS,
                 merchant,
                 amountRaw
+            );
+
+            // Encrypt merchant address for FHE
+            setStatus("Encrypting merchant address...");
+            const { handle: encMerchantHandle, inputProof: merchantProof } = await encryptAddress(
+                CONTRACT_ADDRESS,
+                merchant,
+                merchant
             );
 
             // Submit to blockchain
@@ -71,7 +90,18 @@ export const useCreateInvoice = () => {
                 address: CONTRACT_ADDRESS as `0x${string}`,
                 abi: BlindPayABI,
                 functionName: "createInvoice",
-                args: [encHandle, inputProof, salt, commitHash, invoiceTypeNum, tokenType],
+                args: [
+                    encAmountHandle,
+                    amountProof,
+                    encMerchantHandle,
+                    merchantProof,
+                    salt,
+                    claimHash,
+                    invoiceTypeNum,
+                    tokenType,
+                ],
+                account: publicKey as `0x${string}`,
+                chainId: 11155111,
             });
 
             setStatus("Waiting for confirmation...");
@@ -82,7 +112,7 @@ export const useCreateInvoice = () => {
             try {
                 const { createInvoice } = await import("../services/api");
                 await createInvoice({
-                    invoice_hash: commitHash,
+                    invoice_hash: salt, // Use salt as the primary identifier now
                     merchant_address: merchant,
                     status: "PENDING",
                     salt: salt,
@@ -91,10 +121,10 @@ export const useCreateInvoice = () => {
                     invoice_transaction_id: txHash,
                 });
             } catch (dbErr) {
-                console.error("Failed to save invoice to DB:", dbErr);
+                console.warn("Failed to save invoice to DB:", dbErr);
             }
 
-            // Build payment link
+            // Build payment link (merchant address still needed for claim verification offline)
             const params = new URLSearchParams({
                 merchant,
                 amount: amount?.toString() || "0",
@@ -111,13 +141,13 @@ export const useCreateInvoice = () => {
                 merchant,
                 amount: Number(amount),
                 salt,
-                hash: commitHash,
+                claimSecret,
                 link,
             });
             setStatus("Invoice created successfully!");
         } catch (error: any) {
             console.error(error);
-            setStatus(`Error: ${error.message || "Failed to create invoice"}`);
+            setStatus(`Error: ${error.shortMessage || error.message || "Failed to create invoice"}`);
         } finally {
             setLoading(false);
         }

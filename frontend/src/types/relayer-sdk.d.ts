@@ -4,9 +4,10 @@ declare module "@zama-fhe/relayer-sdk/web" {
             contractAddress: string,
             signerAddress: string
         ): {
-            add64(value: number): any;
+            add64(value: number | bigint): any;
             addBool(value: boolean): any;
             add8(value: number): any;
+            addAddress(value: string): any;
             encrypt(): Promise<{
                 handles: string[];
                 inputProof: string;
@@ -36,4 +37,6 @@ declare module "@zama-fhe/relayer-sdk/web" {
     export const SepoliaConfig: FhevmConfig;
 
     export function createInstance(config: FhevmConfig): Promise<FhevmInstance>;
+
+    export function initSDK(): Promise<void>;
 }

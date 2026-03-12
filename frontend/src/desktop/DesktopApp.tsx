@@ -9,6 +9,7 @@ import Docs from './pages/Docs';
 import Privacy from './pages/Privacy';
 import Verification from './pages/Verification';
 import Vision from './pages/Vision';
+import Faucet from './pages/Faucet';
 import { ChangelogOverlay } from './components/ChangelogOverlay';
 
 const DesktopAnimatedRoutes = () => {
@@ -25,6 +26,7 @@ const DesktopAnimatedRoutes = () => {
                 <Route path="/docs" element={<Docs />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/verify" element={<Verification />} />
+                <Route path="/faucet" element={<Faucet />} />
             </Routes>
         </AnimatePresence>
     );

@@ -5,10 +5,10 @@ import {
     readContract,
     writeContract,
     waitForTransactionReceipt,
+    switchChain,
 } from "wagmi/actions";
 import { wagmiConfig } from "./WalletProvider";
 import {
-    computeInvoiceHash,
     generateSalt,
     parseAmount,
     CONTRACT_ADDRESS,
@@ -16,6 +16,7 @@ import {
     BlindPayABI,
     MockUSDCABI,
 } from "../utils/evm-utils";
+import { encryptAmount } from "../utils/fhe";
 
 export type PaymentStep =
     | "CONNECT"
@@ -26,13 +27,12 @@ export type PaymentStep =
 
 export const usePayment = () => {
     const [searchParams] = useSearchParams();
-    const { address: publicKey, isConnected } = useWallet();
+    const { address: publicKey, isConnected, isWrongChain } = useWallet();
 
     const [invoice, setInvoice] = useState<{
         merchant: string;
         amount: number;
         salt: string;
-        hash: string;
         memo: string;
         tokenType: number;
         invoiceType: number;
@@ -48,7 +48,7 @@ export const usePayment = () => {
     const [receiptHash] = useState<string | null>(null);
     const [receiptSearchFailed] = useState(false);
 
-    // Verify invoice on mount
+    // Parse and verify invoice on mount (only when searchParams change)
     useEffect(() => {
         const init = async () => {
             const merchant = searchParams.get("merchant");
@@ -76,35 +76,26 @@ export const usePayment = () => {
                 setLoading(true);
                 setStatus("Verifying invoice...");
 
-                const computedHash = computeInvoiceHash(
-                    merchant as `0x${string}`,
-                    parseAmount(amount || "0"),
-                    salt as `0x${string}`
-                );
-
-                // Try on-chain verification first
+                // V2: getInvoice returns [tokenType, invoiceType, paymentCount, hasBeenCreated]
                 try {
                     const onChainInvoice = (await readContract(wagmiConfig, {
                         address: CONTRACT_ADDRESS as `0x${string}`,
                         abi: BlindPayABI,
                         functionName: "getInvoice",
                         args: [salt as `0x${string}`],
-                    })) as [string, number, number, number, bigint, string];
+                    })) as [number, number, bigint, boolean];
 
-                    const onChainMerchant = onChainInvoice[0];
-                    const onChainStatus = onChainInvoice[3];
+                    const onChainPaymentCount = Number(onChainInvoice[2]);
+                    const hasBeenCreated = onChainInvoice[3];
 
-                    if (
-                        onChainMerchant !==
-                        "0x0000000000000000000000000000000000000000"
-                    ) {
-                        // Invoice exists on-chain
-                        if (onChainStatus === 1) {
+                    if (hasBeenCreated) {
+                        // For standard invoices (not multipay), check if already paid
+                        const onChainInvoiceType = onChainInvoice[1];
+                        if (onChainInvoiceType !== 1 && onChainPaymentCount > 0) {
                             setInvoice({
                                 merchant,
                                 amount: Number(amount) || 0,
                                 salt,
-                                hash: computedHash,
                                 memo,
                                 tokenType,
                                 invoiceType: initialType,
@@ -124,7 +115,7 @@ export const usePayment = () => {
                     const { fetchInvoiceByHash } = await import(
                         "../services/api"
                     );
-                    dbInvoice = await fetchInvoiceByHash(computedHash);
+                    dbInvoice = await fetchInvoiceByHash(salt);
                 } catch {
                     // Not in DB either — that's fine for new invoices
                 }
@@ -137,7 +128,6 @@ export const usePayment = () => {
                         merchant,
                         amount: Number(amount) || 0,
                         salt,
-                        hash: computedHash,
                         memo,
                         tokenType,
                         invoiceType: initialType,
@@ -151,18 +141,12 @@ export const usePayment = () => {
                     merchant,
                     amount: Number(amount) || 0,
                     salt,
-                    hash: computedHash,
                     memo,
                     tokenType,
                     invoiceType: initialType,
                 });
 
                 setStatus("");
-                if (isConnected) {
-                    setStep("PAY");
-                } else {
-                    setStep("CONNECT");
-                }
             } catch (err) {
                 console.error(err);
                 setError("Failed to verify invoice.");
@@ -172,10 +156,27 @@ export const usePayment = () => {
         };
 
         init();
-    }, [searchParams, isConnected]);
+    }, [searchParams]);
+
+    // Advance step when wallet connects
+    useEffect(() => {
+        if (isConnected && step === "CONNECT") {
+            setStep("PAY");
+        }
+    }, [isConnected, step]);
 
     const payInvoice = async () => {
         if (!invoice || !publicKey) return;
+
+        if (isWrongChain) {
+            try {
+                setStatus("Switching to Sepolia...");
+                await switchChain(wagmiConfig, { chainId: 11155111 });
+            } catch {
+                setError("Please switch to Sepolia network in your wallet.");
+                return;
+            }
+        }
 
         try {
             setLoading(true);
@@ -195,11 +196,21 @@ export const usePayment = () => {
                     abi: MockUSDCABI,
                     functionName: "approve",
                     args: [CONTRACT_ADDRESS as `0x${string}`, payAmount],
+                    account: publicKey as `0x${string}`,
+                    chainId: 11155111,
                 });
                 await waitForTransactionReceipt(wagmiConfig, {
                     hash: approveHash,
                 });
             }
+
+            // Encrypt the payment amount with FHE
+            setStatus("Encrypting payment amount...");
+            const { handle: encPayHandle, inputProof } = await encryptAmount(
+                CONTRACT_ADDRESS,
+                publicKey,
+                payAmount
+            );
 
             setStatus("Submitting payment...");
 
@@ -207,12 +218,22 @@ export const usePayment = () => {
             const ethValue =
                 invoice.tokenType === 0 ? payAmount * 1_000_000_000_000n : 0n;
 
+            // USDC: pass plaintext amount for transferFrom (visible in ERC20 event anyway)
+            const usdcAmount = invoice.tokenType === 1 ? payAmount : 0n;
+
             const txHash = await writeContract(wagmiConfig, {
                 address: CONTRACT_ADDRESS as `0x${string}`,
                 abi: BlindPayABI,
                 functionName: "payInvoice",
-                args: [invoice.salt as `0x${string}`, payAmount],
+                args: [
+                    invoice.salt as `0x${string}`,
+                    encPayHandle,
+                    inputProof,
+                    usdcAmount,
+                ],
                 value: ethValue,
+                account: publicKey as `0x${string}`,
+                chainId: 11155111,
             });
 
             setStatus("Waiting for confirmation...");
@@ -225,7 +246,7 @@ export const usePayment = () => {
                 const { updateInvoiceStatus } = await import(
                     "../services/api"
                 );
-                await updateInvoiceStatus(invoice.hash, {
+                await updateInvoiceStatus(invoice.salt, {
                     status: "SETTLED",
                     payment_tx_ids: [txHash],
                 });

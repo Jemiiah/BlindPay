@@ -143,15 +143,9 @@ const Profile: React.FC = () => {
     };
 
     const merchantStats = {
-        balance: 'Loading...',
-        creditsSales: (merchantReceipts
-            .filter(r => r.tokenType !== 1)
-            .reduce((acc, curr) => acc + (Number(curr.amount) / 1_000_000 || 0), 0) / 2)
-            .toFixed(2),
-        usdcxSales: (merchantReceipts
-            .filter(r => r.tokenType === 1)
-            .reduce((acc, curr) => acc + (Number(curr.amount) / 1_000_000 || 0), 0) / 2)
-            .toFixed(2),
+        balance: 'Encrypted',
+        creditsSales: 'Encrypted',
+        usdcxSales: 'Encrypted',
         invoices: combinedInvoices.length,
         settled: combinedInvoices.filter(inv => inv.status === 'SETTLED' || String(inv.status) === '1').length,
         pending: combinedInvoices.filter(inv => inv.status === 'PENDING' || String(inv.status) === '0').length

@@ -14,6 +14,7 @@ const Navbar = () => {
         { path: '/vision', label: 'Vision' },
         { label: 'Privacy', path: '/privacy' },
         { label: 'Docs', path: '/docs' },
+        { label: 'Faucet', path: '/faucet' },
     ];
 
     return (

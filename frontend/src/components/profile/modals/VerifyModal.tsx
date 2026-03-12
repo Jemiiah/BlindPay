@@ -46,13 +46,13 @@ export const VerifyModal: React.FC<VerifyModalProps> = ({
                     >
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-white">Verify Invoice Payment</h3>
-                            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">✕</button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">x</button>
                         </div>
 
                         {verifyingInvoice && (
                             <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/5">
                                 <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Verifying For Invoice</div>
-                                <div className="font-mono text-neon-primary text-sm truncate">{verifyingInvoice.invoiceHash}</div>
+                                <div className="font-mono text-neon-primary text-sm truncate">{verifyingInvoice.invoiceHash || verifyingInvoice.salt}</div>
                             </div>
                         )}
 
@@ -73,7 +73,7 @@ export const VerifyModal: React.FC<VerifyModalProps> = ({
                             {verifyingInvoice && (() => {
                                 const seen = new Set<string>();
                                 const matchingReceipts = merchantReceipts.filter(r => {
-                                    if (r.invoiceHash !== verifyingInvoice.invoiceHash) return false;
+                                    if (r.salt !== (verifyingInvoice.salt || verifyingInvoice.invoiceHash)) return false;
                                     if (seen.has(r.receiptHash)) return false;
                                     seen.add(r.receiptHash);
                                     return true;
@@ -101,8 +101,8 @@ export const VerifyModal: React.FC<VerifyModalProps> = ({
                                                         </span>
                                                         <CopyButton text={receipt.receiptHash} title="Copy Receipt Hash" className="text-gray-600 hover:text-white flex-shrink-0" />
                                                     </div>
-                                                    <span className="font-bold text-white text-sm whitespace-nowrap ml-3">
-                                                        {Number(receipt.amount) / 1_000_000} <span className="text-xs text-gray-400 font-normal">{receipt.tokenType === 1 ? 'USDC' : 'ETH'}</span>
+                                                    <span className="text-xs text-gray-500 font-mono whitespace-nowrap ml-3">
+                                                        Encrypted
                                                     </span>
                                                 </div>
                                             ))}
@@ -118,13 +118,7 @@ export const VerifyModal: React.FC<VerifyModalProps> = ({
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                         Payment Verified!
                                     </div>
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-400">Amount Paid:</span>
-                                            <span className="text-white font-mono">{verifiedRecord.amount} {verifiedRecord.tokenType === 1 ? 'USDCx' : 'Credits'}</span>
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-2">Matches your private records.</div>
-                                    </div>
+                                    <div className="text-xs text-gray-500 mt-2">Receipt exists on-chain.</div>
                                 </div>
                             )}
 
@@ -136,7 +130,6 @@ export const VerifyModal: React.FC<VerifyModalProps> = ({
                                     </div>
                                     <div className="text-sm text-gray-300">
                                         This receipt is valid but belongs to a <strong>different invoice</strong>.
-                                        <div className="mt-1 font-mono text-xs text-gray-500">Receipt Invoice: {verifiedRecord.invoiceHash.slice(0, 10)}...</div>
                                     </div>
                                 </div>
                             )}

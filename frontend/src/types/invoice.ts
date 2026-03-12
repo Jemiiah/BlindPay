@@ -2,7 +2,7 @@ export interface InvoiceData {
     merchant: string;
     amount: number;
     salt: string;
-    hash: string;
+    claimSecret: string;
     link: string;
 }
 
