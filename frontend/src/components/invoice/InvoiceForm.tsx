@@ -56,7 +56,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                             <button
                                 onClick={() => setTokenType(1)}
                                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${tokenType === 1
-                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                                    ? 'bg-white text-black shadow-lg'
                                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                                     }`}
                             >
@@ -82,7 +82,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         <button
                             onClick={() => setInvoiceType('multipay')}
                             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${invoiceType === 'multipay'
-                                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                                ? 'bg-white text-black shadow-lg'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
@@ -91,7 +91,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                         <button
                             onClick={() => setInvoiceType('donation')}
                             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${invoiceType === 'donation'
-                                ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                                ? 'bg-white text-black shadow-lg'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
@@ -105,7 +105,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
                     {invoiceType === 'multipay' && 'Allows multiple payments. Ideal for campaigns.'}
                     {invoiceType === 'donation' && (
                         <span>
-                            <strong className="text-pink-400 block mb-1">Donation Mode</strong>
+                            <strong className="text-white block mb-1">Donation Mode</strong>
                             Used by NGOs, fundraising platforms, developers, and for crowd funding where payer and receiver info stays encrypted on-chain via FHE.
                         </span>
                     )}

@@ -8,7 +8,7 @@ const Navbar = () => {
     const isActive = (path: string) => location.pathname === path;
 
     const navItems = [
-        { path: '/', label: 'Explorer' },
+        { path: '/explorer', label: 'Explorer' },
         { path: '/create', label: 'Create Invoice' },
         { path: '/profile', label: 'Profile' },
         { path: '/vision', label: 'Vision' },
