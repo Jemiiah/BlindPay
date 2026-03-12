@@ -16,7 +16,7 @@ import {
     BlindPayABI,
     MockUSDCABI,
 } from "../utils/evm-utils";
-import { encryptAmount } from "../utils/fhe";
+import { encryptAmount, FheRelayerError } from "../utils/fhe";
 
 export type PaymentStep =
     | "CONNECT"
@@ -258,7 +258,11 @@ export const usePayment = () => {
             setStatus("");
         } catch (e: any) {
             console.error(e);
-            setError(e.shortMessage || e.message || "Payment failed");
+            if (e instanceof FheRelayerError) {
+                setError("FHE encryption service is temporarily unavailable. Zama's testnet relayer may be down — please try again in a few minutes.");
+            } else {
+                setError(e.shortMessage || e.message || "Payment failed");
+            }
         } finally {
             setLoading(false);
         }

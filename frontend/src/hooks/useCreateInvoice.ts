@@ -10,7 +10,7 @@ import {
     CONTRACT_ADDRESS,
     BlindPayABI,
 } from "../utils/evm-utils";
-import { encryptAmount, encryptAddress } from "../utils/fhe";
+import { encryptAmount, encryptAddress, FheRelayerError } from "../utils/fhe";
 import { InvoiceData } from "../types/invoice";
 
 export type InvoiceType = "standard" | "multipay" | "donation";
@@ -147,7 +147,11 @@ export const useCreateInvoice = () => {
             setStatus("Invoice created successfully!");
         } catch (error: any) {
             console.error(error);
-            setStatus(`Error: ${error.shortMessage || error.message || "Failed to create invoice"}`);
+            if (error instanceof FheRelayerError) {
+                setStatus("FHE encryption service is temporarily unavailable. Zama's testnet relayer may be down — please try again in a few minutes.");
+            } else {
+                setStatus(`Error: ${error.shortMessage || error.message || "Failed to create invoice"}`);
+            }
         } finally {
             setLoading(false);
         }

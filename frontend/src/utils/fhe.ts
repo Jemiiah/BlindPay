@@ -5,6 +5,27 @@ import { toHex } from "viem";
 let instance: FhevmInstance | null = null;
 let initPromise: Promise<FhevmInstance> | null = null;
 
+const isRelayerError = (err: unknown): boolean => {
+    const msg = err instanceof Error ? err.message : String(err);
+    return (
+        msg.includes("Bad JSON") ||
+        msg.includes("ERR_CONNECTION") ||
+        msg.includes("Failed to fetch") ||
+        msg.includes("NetworkError") ||
+        msg.includes("relayer")
+    );
+};
+
+export class FheRelayerError extends Error {
+    constructor(cause?: unknown) {
+        super(
+            "FHE encryption service is temporarily unavailable. Zama's testnet relayer may be down — please try again in a few minutes."
+        );
+        this.name = "FheRelayerError";
+        this.cause = cause;
+    }
+}
+
 /**
  * Get or create the singleton FHE instance.
  * Uses a promise guard to prevent concurrent initialization from StrictMode.
@@ -13,12 +34,20 @@ export const getFheInstance = async (): Promise<FhevmInstance> => {
     if (instance) return instance;
     if (initPromise) return initPromise;
     initPromise = (async () => {
-        await initSDK();
-        instance = await createInstance({
-            ...SepoliaConfig,
-            network: import.meta.env.VITE_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
-        });
-        return instance;
+        try {
+            await initSDK();
+            instance = await createInstance({
+                ...SepoliaConfig,
+                network: import.meta.env.VITE_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+            });
+            return instance;
+        } catch (err) {
+            // Reset so next call retries instead of returning the failed promise
+            instance = null;
+            initPromise = null;
+            if (isRelayerError(err)) throw new FheRelayerError(err);
+            throw err;
+        }
     })();
     return initPromise;
 };
@@ -47,21 +76,27 @@ export const encryptAmount = async (
     signerAddress: string,
     amount: number | bigint
 ): Promise<{ handle: `0x${string}`; inputProof: `0x${string}` }> => {
-    const fhe = await getFheInstance();
-    const input = fhe.createEncryptedInput(contractAddress, signerAddress);
+    try {
+        const fhe = await getFheInstance();
+        const input = fhe.createEncryptedInput(contractAddress, signerAddress);
 
-    const bigAmount = typeof amount === 'bigint' ? amount : BigInt(amount);
-    if (bigAmount > BigInt("18446744073709551615")) {
-        throw new Error('Amount exceeds uint64 range for FHE encryption');
+        const bigAmount = typeof amount === 'bigint' ? amount : BigInt(amount);
+        if (bigAmount > BigInt("18446744073709551615")) {
+            throw new Error('Amount exceeds uint64 range for FHE encryption');
+        }
+        input.add64(bigAmount);
+
+        const encrypted = await input.encrypt();
+
+        return {
+            handle: ensureHex(encrypted.handles[0]),
+            inputProof: ensureHex(encrypted.inputProof),
+        };
+    } catch (err) {
+        if (err instanceof FheRelayerError) throw err;
+        if (isRelayerError(err)) throw new FheRelayerError(err);
+        throw err;
     }
-    input.add64(bigAmount);
-
-    const encrypted = await input.encrypt();
-
-    return {
-        handle: ensureHex(encrypted.handles[0]),
-        inputProof: ensureHex(encrypted.inputProof),
-    };
 };
 
 /**
@@ -73,14 +108,20 @@ export const encryptAddress = async (
     signerAddress: string,
     addressToEncrypt: string
 ): Promise<{ handle: `0x${string}`; inputProof: `0x${string}` }> => {
-    const fhe = await getFheInstance();
-    const input = fhe.createEncryptedInput(contractAddress, signerAddress);
-    input.addAddress(addressToEncrypt);
+    try {
+        const fhe = await getFheInstance();
+        const input = fhe.createEncryptedInput(contractAddress, signerAddress);
+        input.addAddress(addressToEncrypt);
 
-    const encrypted = await input.encrypt();
+        const encrypted = await input.encrypt();
 
-    return {
-        handle: ensureHex(encrypted.handles[0]),
-        inputProof: ensureHex(encrypted.inputProof),
-    };
+        return {
+            handle: ensureHex(encrypted.handles[0]),
+            inputProof: ensureHex(encrypted.inputProof),
+        };
+    } catch (err) {
+        if (err instanceof FheRelayerError) throw err;
+        if (isRelayerError(err)) throw new FheRelayerError(err);
+        throw err;
+    }
 };
