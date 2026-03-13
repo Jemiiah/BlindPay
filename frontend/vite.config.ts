@@ -15,14 +15,12 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
-    commonjsOptions: {
-      exclude: [/node_modules\/@zama-fhe\/relayer-sdk/],
-    },
   },
   optimizeDeps: {
     exclude: ["@zama-fhe/relayer-sdk", "tfhe", "tkms"],
   },
   worker: {
+    format: "es",
     plugins: () => [wasm(), topLevelAwait()],
   },
 });
