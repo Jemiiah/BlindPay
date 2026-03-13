@@ -11,10 +11,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
-
-# Debug step: list files to see if they were copied
-RUN ls -la
+COPY package*.json ./
 
 # Install dependencies including native ones
 RUN npm install
