@@ -28,7 +28,7 @@ const Home = () => {
                     {/* ═══════════════════════════════════════════ */}
                     {/* HERO SECTION                                */}
                     {/* ═══════════════════════════════════════════ */}
-                    <section className="relative min-h-[85vh] flex items-center">
+                    <section className="relative min-h-[85vh] flex items-center overflow-hidden">
 
                         {/* Animated background orbs */}
                         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -38,62 +38,142 @@ const Home = () => {
                         </div>
 
                         <div className="relative z-10 w-full px-6 md:px-12 lg:px-24 pt-20">
-                            <motion.div
-                                variants={staggerContainer}
-                                initial="hidden"
-                                animate="show"
-                                className="flex flex-col space-y-6 text-center lg:text-left max-w-xl"
-                            >
-                                <div className="relative">
-                                    <motion.h1
-                                        variants={fadeInUp}
-                                        className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter leading-[1.05] relative z-10"
-                                    >
-                                        Pay Privately.<br />
-                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-300 to-gray-600">
-                                            Encrypt the{' '}
-                                        </span>
-                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/60 to-white/10">
-                                            Truth.
-                                        </span>
-                                    </motion.h1>
-
-                                    <svg viewBox="0 0 500 50" fill="none" xmlns="http://www.w3.org/2000/svg"
-                                        className="absolute bottom-[-20px] left-0 w-[90%] h-auto z-0 pointer-events-none"
-                                    >
-                                        <defs>
-                                            <linearGradient id="curve-grad" x1="0" y1="0" x2="500" y2="0" gradientUnits="userSpaceOnUse">
-                                                <stop offset="0%" stopColor="white" stopOpacity="0.7" />
-                                                <stop offset="50%" stopColor="white" stopOpacity="0.25" />
-                                                <stop offset="100%" stopColor="white" stopOpacity="0" />
-                                            </linearGradient>
-                                        </defs>
-                                        <path d="M 0 40 Q 250 0 500 40" stroke="url(#curve-grad)" strokeWidth="3" strokeLinecap="round" />
-                                    </svg>
-                                </div>
-
-                                <motion.p
-                                    variants={fadeInUp}
-                                    className="text-lg md:text-xl text-gray-400 max-w-lg font-light leading-relaxed"
-                                >
-                                    BlindPay is a confidential payment protocol on Ethereum powered by Fully Homomorphic Encryption.
-                                    Create, send, and settle invoices without ever exposing amounts, addresses, or transaction details on-chain.
-                                </motion.p>
-
+                            <div className="flex flex-col lg:flex-row lg:items-center lg:gap-16 xl:gap-24">
+                                {/* Left column — Hero text */}
                                 <motion.div
-                                    variants={fadeInUp}
-                                    className="flex flex-col sm:flex-row gap-5 pt-4 w-full sm:w-auto justify-center lg:justify-start"
+                                    variants={staggerContainer}
+                                    initial="hidden"
+                                    animate="show"
+                                    className="flex flex-col space-y-6 text-center lg:text-left max-w-xl shrink-0"
                                 >
-                                    <Link to="/explorer" className="group flex items-center justify-center gap-3 px-8 py-5 rounded-full bg-white text-black hover:bg-gray-100 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)] w-full sm:w-auto">
-                                        <span className="font-bold text-lg">Get Started</span>
-                                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                    </Link>
+                                    <div className="relative">
+                                        <motion.h1
+                                            variants={fadeInUp}
+                                            className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter leading-[1.05] relative z-10"
+                                        >
+                                            Pay Privately.<br />
+                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-300 to-gray-600">
+                                                Encrypt the{' '}
+                                            </span>
+                                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/60 to-white/10">
+                                                Truth.
+                                            </span>
+                                        </motion.h1>
 
-                                    <Link to="/docs" className="group flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 backdrop-blur-md">
-                                        <span className="font-semibold text-lg text-gray-300 group-hover:text-white transition-colors">Documentation</span>
-                                    </Link>
+                                        <svg viewBox="0 0 500 50" fill="none" xmlns="http://www.w3.org/2000/svg"
+                                            className="absolute bottom-[-20px] left-0 w-[90%] h-auto z-0 pointer-events-none"
+                                        >
+                                            <defs>
+                                                <linearGradient id="curve-grad" x1="0" y1="0" x2="500" y2="0" gradientUnits="userSpaceOnUse">
+                                                    <stop offset="0%" stopColor="white" stopOpacity="0.7" />
+                                                    <stop offset="50%" stopColor="white" stopOpacity="0.25" />
+                                                    <stop offset="100%" stopColor="white" stopOpacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                            <path d="M 0 40 Q 250 0 500 40" stroke="url(#curve-grad)" strokeWidth="3" strokeLinecap="round" />
+                                        </svg>
+                                    </div>
+
+                                    <motion.p
+                                        variants={fadeInUp}
+                                        className="text-lg md:text-xl text-gray-400 max-w-lg font-light leading-relaxed"
+                                    >
+                                        BlindPay is a confidential payment protocol on Ethereum powered by Fully Homomorphic Encryption.
+                                        Create, send, and settle invoices without ever exposing amounts, addresses, or transaction details on-chain.
+                                    </motion.p>
+
+                                    <motion.div
+                                        variants={fadeInUp}
+                                        className="flex flex-col sm:flex-row gap-5 pt-4 w-full sm:w-auto justify-center lg:justify-start"
+                                    >
+                                        <Link to="/explorer" className="group flex items-center justify-center gap-3 px-8 py-5 rounded-full bg-white text-black hover:bg-gray-100 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:shadow-[0_0_40px_rgba(255,255,255,0.25)] w-full sm:w-auto">
+                                            <span className="font-bold text-lg">Get Started</span>
+                                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                        </Link>
+
+                                        <Link to="/docs" className="group flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300 backdrop-blur-md">
+                                            <span className="font-semibold text-lg text-gray-300 group-hover:text-white transition-colors">Documentation</span>
+                                        </Link>
+                                    </motion.div>
                                 </motion.div>
-                            </motion.div>
+
+                                {/* Right column — Dashboard Snapshot */}
+                                <motion.div
+                                    initial={{ opacity: 0, x: 60, scale: 0.97 }}
+                                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                                    transition={{ duration: 1.1, delay: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                                    className="hidden lg:block flex-1 min-w-0 pointer-events-none select-none"
+                                    style={{
+                                        maskImage: 'linear-gradient(to right, black 0%, black 50%, transparent 100%), linear-gradient(to bottom, black 70%, transparent 100%)',
+                                        WebkitMaskImage: 'linear-gradient(to right, black 0%, black 50%, transparent 100%), linear-gradient(to bottom, black 70%, transparent 100%)',
+                                        maskComposite: 'intersect',
+                                        WebkitMaskComposite: 'source-in' as any,
+                                    }}
+                                >
+                                    {/* Dashboard card */}
+                                    <div className="relative rounded-2xl border border-white/[0.10] bg-white/[0.03] backdrop-blur-md p-6 space-y-5 shadow-[0_8px_60px_rgba(0,0,0,0.4)]">
+                                        {/* Header */}
+                                        <div className="text-center pb-1">
+                                            <h3 className="text-xl font-bold text-white tracking-tight">
+                                                Merchant Dashboard
+                                            </h3>
+                                            <p className="text-[10px] text-gray-500 mt-1">Manage your invoices and settlements</p>
+                                        </div>
+
+                                        {/* Stats row */}
+                                        <div className="grid grid-cols-4 gap-3">
+                                            {[
+                                                { label: 'Volume', value: 'Encrypted', color: 'text-white', size: 'text-base' },
+                                                { label: 'Invoices', value: '12', color: 'text-white', size: 'text-2xl' },
+                                                { label: 'Pending', value: '3', color: 'text-gray-300', size: 'text-2xl' },
+                                                { label: 'Settled', value: '9', color: 'text-white', size: 'text-2xl' },
+                                            ].map((stat, i) => (
+                                                <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3.5">
+                                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider block mb-1">{stat.label}</span>
+                                                    <span className={`${stat.size} font-bold ${stat.color}`}>{stat.value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Tabs */}
+                                        <div className="flex justify-center">
+                                            <div className="flex p-0.5 bg-black/50 rounded-full border border-white/[0.08]">
+                                                <span className="px-5 py-1.5 text-[10px] font-bold uppercase tracking-wider bg-white text-black rounded-full">My Invoices</span>
+                                                <span className="px-5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">Paid</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Invoice table */}
+                                        <div className="rounded-xl border border-white/[0.06] overflow-hidden">
+                                            <div className="grid grid-cols-5 gap-2 px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.06]">
+                                                {['Hash', 'Type', 'Token', 'Status', 'Action'].map(h => (
+                                                    <span key={h} className="text-[10px] font-bold text-gray-500 uppercase">{h}</span>
+                                                ))}
+                                            </div>
+                                            {[
+                                                { hash: '0xa3f1...8d2c', type: 'Standard', token: 'ETH', status: 'SETTLED', sc: 'text-gray-300 bg-white/[0.06] border border-white/[0.08]' },
+                                                { hash: '0x7b2e...1f4a', type: 'Multi Pay', token: 'USDC', status: 'PENDING', sc: 'text-gray-400 bg-white/[0.04] border border-white/[0.06]' },
+                                                { hash: '0xd9c4...6e8b', type: 'Donation', token: 'ETH', status: 'SETTLED', sc: 'text-gray-300 bg-white/[0.06] border border-white/[0.08]' },
+                                                { hash: '0x1e5f...3a7d', type: 'Standard', token: 'USDC', status: 'SETTLED', sc: 'text-gray-300 bg-white/[0.06] border border-white/[0.08]' },
+                                                { hash: '0x8c2a...9b1e', type: 'Standard', token: 'ETH', status: 'PENDING', sc: 'text-gray-400 bg-white/[0.04] border border-white/[0.06]' },
+                                            ].map((row, i) => (
+                                                <div key={i} className="grid grid-cols-5 gap-2 px-4 py-3 border-b border-white/[0.04] items-center">
+                                                    <span className="text-[11px] font-mono text-gray-400">{row.hash}</span>
+                                                    <span className="text-[11px] text-gray-400">{row.type}</span>
+                                                    <span className="text-[11px] text-gray-400">{row.token}</span>
+                                                    <span className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full w-fit ${row.sc}`}>{row.status}</span>
+                                                    <span className="text-[10px] text-gray-600">View</span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Footer */}
+                                        <div className="text-center text-[9px] text-gray-600 italic">
+                                            All data encrypted on-chain using FHE
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            </div>
                         </div>
                     </section>
 
