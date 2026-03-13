@@ -10,16 +10,19 @@ export default defineConfig({
     host: true,
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "credentialless",
+      "Cross-Origin-Embedder-Policy": "require-corp",
     },
   },
   build: {
     target: "esnext",
+    commonjsOptions: {
+      exclude: [/node_modules\/@zama-fhe\/relayer-sdk/],
+    },
   },
   optimizeDeps: {
     exclude: ["@zama-fhe/relayer-sdk", "tfhe", "tkms"],
   },
   worker: {
-    plugins: [wasm(), topLevelAwait()],
+    plugins: () => [wasm(), topLevelAwait()],
   },
 });
