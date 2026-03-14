@@ -29,25 +29,41 @@ export class FheRelayerError extends Error {
 /**
  * Get or create the singleton FHE instance.
  * Uses a promise guard to prevent concurrent initialization from StrictMode.
+ * Retries up to 3 times on network failures (WASM is ~4.7MB and can fail on slow connections).
  */
 export const getFheInstance = async (): Promise<FhevmInstance> => {
     if (instance) return instance;
     if (initPromise) return initPromise;
     initPromise = (async () => {
-        try {
-            await initSDK();
-            instance = await createInstance({
-                ...SepoliaConfig,
-                network: import.meta.env.VITE_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
-            });
-            return instance;
-        } catch (err) {
-            // Reset so next call retries instead of returning the failed promise
-            instance = null;
-            initPromise = null;
-            if (isRelayerError(err)) throw new FheRelayerError(err);
-            throw err;
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                await initSDK();
+                instance = await createInstance({
+                    ...SepoliaConfig,
+                    network: import.meta.env.VITE_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+                });
+                return instance;
+            } catch (err) {
+                instance = null;
+                const isNetworkErr =
+                    err instanceof Error &&
+                    (err.message.includes("NetworkError") ||
+                        err.message.includes("network") ||
+                        err.message.includes("aborted") ||
+                        err.message.includes("ERR_NETWORK"));
+                if (isNetworkErr && attempt < maxRetries) {
+                    await new Promise((r) => setTimeout(r, 1000 * attempt));
+                    continue;
+                }
+                initPromise = null;
+                if (isRelayerError(err)) throw new FheRelayerError(err);
+                throw err;
+            }
         }
+        // Should not reach here, but satisfy TS
+        initPromise = null;
+        throw new Error("FHE initialization failed after retries");
     })();
     return initPromise;
 };
