@@ -4,6 +4,14 @@
 
 BlindPay is a decentralized invoice and payment system leveraging Zama's fhEVM to enable confidential, verifiable transactions on EVM. Merchants create invoices without revealing sensitive information on-chain — amounts, addresses, and payment status are all FHE-encrypted. Payers settle invoices while keeping everything confidential end-to-end.
 
+<p align="center">
+  <img src="assets/screenshots/create-invoice.png" alt="Create Invoice" width="240" />
+  &nbsp;&nbsp;
+  <img src="assets/screenshots/pay-eth.png" alt="Pay with ETH" width="240" />
+  &nbsp;&nbsp;
+  <img src="assets/screenshots/scan-qr.png" alt="Scan QR Code" width="240" />
+</p>
+
 **Smart Contract:** `BlindPay.sol` (Sepolia fhEVM)
 **Encryption:** Zama TFHE — `euint64`, `eaddress`, `ebool`
 
@@ -34,6 +42,10 @@ BlindPay is a decentralized invoice and payment system leveraging Zama's fhEVM t
 ---
 
 ## Architecture
+
+<p align="center">
+  <img src="assets/architecture.svg" alt="BlindPay Architecture" width="800" />
+</p>
 
 BlindPay consists of three layers:
 
@@ -217,7 +229,7 @@ All events are privacy-preserving — no addresses or amounts are emitted.
 
 **1. Clone the repository:**
 ```bash
-git clone https://github.com/your-org/BlindPay.git
+git clone https://github.com/Jemiiah/BlindPay.git
 cd BlindPay
 ```
 
@@ -432,6 +444,10 @@ Client (Browser)                    fhEVM (On-Chain)
 
 ### 1. Merchant Creates Invoice
 
+<p align="center">
+  <img src="assets/screenshots/create-invoice.png" alt="Create Invoice — ETH/USDC, Standard/Multi Pay/Donation" width="280" />
+</p>
+
 - Client generates random `salt` (bytes32) and `claimSecret` (bytes32)
 - Computes `claimHash = keccak256(merchant, salt, claimSecret)`
 - FHE-encrypts amount (`euint64`) and merchant address (`eaddress`) in-browser
@@ -440,11 +456,21 @@ Client (Browser)                    fhEVM (On-Chain)
 
 ### 2. Payer Receives Link
 
+<p align="center">
+  <img src="assets/screenshots/scan-qr.png" alt="Scan Blind Invoice QR Code" width="280" />
+</p>
+
 - Payment link contains: `merchant`, `amount`, `salt`, `memo`, `type`, `token`
 - Frontend verifies invoice exists on-chain via `getInvoice(salt)`
 - Checks payment status (already paid for standard invoices)
 
 ### 3. Payment Executed
+
+<p align="center">
+  <img src="assets/screenshots/pay-eth.png" alt="Pay 0.003 ETH" width="280" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/screenshots/pay-usdc.png" alt="Pay 1000 USDC" width="280" />
+</p>
 
 - Payer FHE-encrypts payment amount client-side
 - For USDC: approves contract spend, then calls `payInvoice()`
