@@ -4,13 +4,9 @@
 
 BlindPay is a decentralized invoice and payment system leveraging Zama's fhEVM to enable confidential, verifiable transactions on EVM. Merchants create invoices without revealing sensitive information on-chain — amounts, addresses, and payment status are all FHE-encrypted. Payers settle invoices while keeping everything confidential end-to-end.
 
-<p align="center">
-  <img src="assets/screenshots/create-invoice.png" alt="Create Invoice" width="240" />
-  &nbsp;&nbsp;
-  <img src="assets/screenshots/pay-eth.png" alt="Pay with ETH" width="240" />
-  &nbsp;&nbsp;
-  <img src="assets/screenshots/scan-qr.png" alt="Scan QR Code" width="240" />
-</p>
+| Create Invoice | Pay (ETH) | Pay (USDC) | Scan QR |
+|:-:|:-:|:-:|:-:|
+| <img src="assets/screenshots/create-invoice.png" alt="Create Invoice" width="200" /> | <img src="assets/screenshots/pay-eth.png" alt="Pay with ETH" width="200" /> | <img src="assets/screenshots/pay-usdc.png" alt="Pay with USDC" width="200" /> | <img src="assets/screenshots/scan-qr.png" alt="Scan QR Code" width="200" /> |
 
 **Smart Contract:** `BlindPay.sol` (Sepolia fhEVM)
 **Encryption:** Zama TFHE — `euint64`, `eaddress`, `ebool`
@@ -442,11 +438,11 @@ Client (Browser)                    fhEVM (On-Chain)
 
 ## How It Works
 
-### 1. Merchant Creates Invoice
+| 1. Create Invoice | 2. Scan / Receive Link | 3. Pay (ETH or USDC) |
+|:-:|:-:|:-:|
+| <img src="assets/screenshots/create-invoice.png" alt="Create Invoice" width="220" /> | <img src="assets/screenshots/scan-qr.png" alt="Scan Blind Invoice" width="220" /> | <img src="assets/screenshots/pay-eth.png" alt="Pay with ETH" width="220" /> |
 
-<p align="center">
-  <img src="assets/screenshots/create-invoice.png" alt="Create Invoice — ETH/USDC, Standard/Multi Pay/Donation" width="280" />
-</p>
+### 1. Merchant Creates Invoice
 
 - Client generates random `salt` (bytes32) and `claimSecret` (bytes32)
 - Computes `claimHash = keccak256(merchant, salt, claimSecret)`
@@ -456,21 +452,11 @@ Client (Browser)                    fhEVM (On-Chain)
 
 ### 2. Payer Receives Link
 
-<p align="center">
-  <img src="assets/screenshots/scan-qr.png" alt="Scan Blind Invoice QR Code" width="280" />
-</p>
-
 - Payment link contains: `merchant`, `amount`, `salt`, `memo`, `type`, `token`
 - Frontend verifies invoice exists on-chain via `getInvoice(salt)`
 - Checks payment status (already paid for standard invoices)
 
 ### 3. Payment Executed
-
-<p align="center">
-  <img src="assets/screenshots/pay-eth.png" alt="Pay 0.003 ETH" width="280" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshots/pay-usdc.png" alt="Pay 1000 USDC" width="280" />
-</p>
 
 - Payer FHE-encrypts payment amount client-side
 - For USDC: approves contract spend, then calls `payInvoice()`
