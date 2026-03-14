@@ -52,12 +52,37 @@ export const ConnectButton: React.FC<ConnectButtonProps> = ({ className = "" }) 
 
     if (isConnected && address) {
         return (
-            <button
-                onClick={() => disconnect()}
-                className={`bg-black/50 backdrop-blur-lg border border-white/10 rounded-full py-3 px-6 font-sans font-semibold text-sm text-white hover:bg-white/10 hover:border-white/30 transition-all shadow-[0_0_15px_rgba(0,243,255,0.1)] hover:shadow-[0_0_25px_rgba(0,243,255,0.3)] ${className}`}
-            >
-                {shortenAddress(address)}
-            </button>
+            <div className="relative" ref={dropdownRef}>
+                <button
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className={`bg-black/50 backdrop-blur-lg border border-white/10 rounded-full py-3 px-6 font-sans font-semibold text-sm text-white hover:bg-white/10 hover:border-white/30 transition-all shadow-[0_0_15px_rgba(0,243,255,0.1)] hover:shadow-[0_0_25px_rgba(0,243,255,0.3)] ${className}`}
+                >
+                    {shortenAddress(address)}
+                </button>
+
+                {showDropdown && (
+                    <div className="absolute right-0 top-full mt-2 z-50 bg-black/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 min-w-[200px] shadow-2xl">
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(address);
+                                setShowDropdown(false);
+                            }}
+                            className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-xl py-2.5 px-3 font-sans text-sm text-white transition-all text-left w-full"
+                        >
+                            Copy Address
+                        </button>
+                        <button
+                            onClick={() => {
+                                disconnect();
+                                setShowDropdown(false);
+                            }}
+                            className="flex items-center gap-3 bg-white/5 hover:bg-red-900/30 border border-white/5 hover:border-red-500/30 rounded-xl py-2.5 px-3 font-sans text-sm text-red-400 transition-all text-left w-full mt-1.5"
+                        >
+                            Disconnect
+                        </button>
+                    </div>
+                )}
+            </div>
         );
     }
 
