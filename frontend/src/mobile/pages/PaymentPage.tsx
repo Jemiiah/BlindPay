@@ -20,7 +20,8 @@ const MobilePaymentPage = () => {
     const {
         step, status, loading, error, invoice, txId,
         handleConnect, payInvoice,
-        donationAmount, setDonationAmount
+        donationAmount, setDonationAmount,
+        isWrongChain, switchToSepolia
     } = usePayment();
 
     const { isConnected } = useWallet();
@@ -184,6 +185,15 @@ const MobilePaymentPage = () => {
                             </div>
                         ) : step === 'VERIFY' ? (
                             <Button variant="primary" onClick={handleConnect} className="w-full">Verify Hash & Records</Button>
+                        ) : isWrongChain ? (
+                            <div className="space-y-3">
+                                <div className="p-3 bg-yellow-900/30 border border-yellow-500/30 rounded-xl text-center">
+                                    <p className="text-yellow-300 text-xs font-medium">Your wallet is on the wrong network. Please switch to Sepolia to continue.</p>
+                                </div>
+                                <Button variant="primary" onClick={switchToSepolia} className="w-full" glow>
+                                    Switch to Sepolia
+                                </Button>
+                            </div>
                         ) : (
                             <Button variant="primary" onClick={handlePay} disabled={isProcess} className="w-full" glow>
                                 {isProcess ? (

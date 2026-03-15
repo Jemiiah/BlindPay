@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 
@@ -8,6 +9,13 @@ export const useWallet = () => {
     const { switchChain } = useSwitchChain();
 
     const isWrongChain = isConnected && !!chain && chain.id !== sepolia.id;
+
+    // Auto-switch to Sepolia when connected on wrong chain
+    useEffect(() => {
+        if (isWrongChain && switchChain) {
+            switchChain({ chainId: sepolia.id });
+        }
+    }, [isWrongChain, switchChain]);
 
     const connectWallet = async () => {
         try {

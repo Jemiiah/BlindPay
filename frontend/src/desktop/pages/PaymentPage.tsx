@@ -23,7 +23,9 @@ const PaymentPage = () => {
         paymentSecret,
         receiptHash,
         donationAmount,
-        setDonationAmount
+        setDonationAmount,
+        isWrongChain,
+        switchToSepolia
     } = usePayment();
 
     const [copiedHash, setCopiedHash] = useState(false);
@@ -224,6 +226,15 @@ const PaymentPage = () => {
                             <Button variant="primary" onClick={handleConnect} className="w-full">
                                 Verify Hash & Records
                             </Button>
+                        ) : isWrongChain ? (
+                            <div className="space-y-3">
+                                <div className="p-3 bg-yellow-900/30 border border-yellow-500/30 rounded-xl text-center">
+                                    <p className="text-yellow-300 text-sm font-medium">Your wallet is on the wrong network. Please switch to Sepolia to continue.</p>
+                                </div>
+                                <Button variant="primary" onClick={switchToSepolia} className="w-full" glow>
+                                    Switch to Sepolia
+                                </Button>
+                            </div>
                         ) : (
                             <Button
                                 variant="primary"

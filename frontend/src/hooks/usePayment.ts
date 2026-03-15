@@ -27,7 +27,7 @@ export type PaymentStep =
 
 export const usePayment = () => {
     const [searchParams] = useSearchParams();
-    const { address: publicKey, isConnected, isWrongChain } = useWallet();
+    const { address: publicKey, isConnected, isWrongChain, switchToSepolia } = useWallet();
 
     const [invoice, setInvoice] = useState<{
         merchant: string;
@@ -172,6 +172,8 @@ export const usePayment = () => {
             try {
                 setStatus("Switching to Sepolia...");
                 await switchChain(wagmiConfig, { chainId: 11155111 });
+                // Give mobile wallets time to settle after chain switch
+                await new Promise((r) => setTimeout(r, 1000));
             } catch {
                 setError("Please switch to Sepolia network in your wallet.");
                 return;
@@ -290,5 +292,7 @@ export const usePayment = () => {
         receiptSearchFailed,
         donationAmount,
         setDonationAmount,
+        isWrongChain,
+        switchToSepolia,
     };
 };
